@@ -1,0 +1,26 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+#grid-container {
+    display: grid;
+    gap: 2px;
+    margin-top: 20px;
+}
+
+.grid-cell {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ccc;
+    background-color: white;
+    cursor: pointer;
+}
+
+.grid-cell:hover {
+    background-color: #f0f0f0;
+}
+
+button {
+    margin: 10px;
+}

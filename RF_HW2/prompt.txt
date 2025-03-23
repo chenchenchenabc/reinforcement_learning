@@ -1,0 +1,47 @@
+Create an HTML page that generates a grid map and allows users to interact with it by setting start and end points, adding barriers, and running a value iteration algorithm for pathfinding. The page should include the following features:
+
+1.Grid Generation:
+
+Users should be able to choose a grid size (between 5 and 9) through an input field and a button that generates the grid.
+
+The grid should consist of clickable cells that allow the user to interact with them.
+
+2.Interaction Modes:
+
+There should be buttons to toggle between:
+
+Setting the start and end points on the grid.
+
+Adding barriers to the grid.
+
+Starting a value iteration algorithm.
+
+3.Visuals:
+
+The start point should be highlighted in green.
+
+The end point should be highlighted in red.
+
+Barriers should be highlighted in gray.
+
+Each grid cell should show the best action (up, down, left, or right) and the value (V(s)) of that cell from the value iteration algorithm.
+
+4.JavaScript Functions:
+
+Generate a grid based on the input size.
+
+Allow users to set start and end points by clicking on grid cells.
+
+Allow users to add barriers by clicking on grid cells (with a limit on the number of barriers).
+
+Implement a value iteration algorithm that updates the grid values based on actions and rewards.
+
+Draw the grid and update the values after the value iteration is complete.
+
+5.Styles:
+
+The grid should have clear, defined borders.
+
+The arrows indicating actions and the value text should be clearly visible within each grid cell.
+
+Also, include the necessary JavaScript code for implementing value iteration, handling grid updates, and performing the user interactions like setting the start, end, and barriers.

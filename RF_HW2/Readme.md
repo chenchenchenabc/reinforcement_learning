@@ -1,0 +1,1 @@
+資料夾下終端機內輸入python app.py
