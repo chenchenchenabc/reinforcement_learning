@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Map</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .grid-container {
+            display: grid;
+            gap: 2px;
+        }
+        .grid-cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+        .arrow {
+            position: absolute;
+            font-size: 20px;
+        }
+        .value-text {
+            position: absolute;
+            bottom: 5px;
+            font-size: 12px;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Grid Map</h1>
+    <div>
+        <label for="grid-size">Grid Size (n): </label>
+        <input type="number" id="grid-size" min="5" max="9" value="5">
+        <button onclick="generateGrid()">Generate Grid</button>
+    </div>
+    <div>
+        <button id="start-end-btn" onclick="setMode('start-end')">Start-End</button>
+        <button id="barrier-btn" onclick="setMode('barrier')">Barrier</button>
+        <button id="start-value-iteration" onclick="startValueIteration()">Start Value Iteration</button>
+        <button onclick="clearGrid()">Clear</button>
+    </div>
+    <div id="grid-container"></div>
+
+    <script>
+        let grid = [];
+        let start = null;
+        let end = null;
+        let obstacles = [];
+        let mode = '';
+        let barrierClicks = 0;
+        let actions = [];
+        let gamma = 0.9;  // Discount factor
+        let iterations = 100;  // Number of iterations for value iteration
+        const actionDirections = ['↑', '↓', '←', '→'];
+        const directionOffsets = [
+            { row: -1, col: 0 },  // ↑
+            { row: 1, col: 0 },   // ↓
+            { row: 0, col: -1 },  // ←
+            { row: 0, col: 1 },   // → 
+        ];
+
+        function generateGrid() {
+            const n = parseInt(document.getElementById('grid-size').value);
+            grid = createGrid(n);
+            actions = generateRandomActions(n);
+            drawGrid(n);
+        }
+
+        function createGrid(n) {
+            let newGrid = [];
+            for (let i = 0; i < n; i++) {
+                let row = [];
+                for (let j = 0; j < n; j++) {
+                    row.push({ value: 0, action: '' });  // Initialize value and action
+                }
+                newGrid.push(row);
+            }
+            return newGrid;
+        }
+
+        function generateRandomActions(n) {
+            const actionsList = ['↑', '↓', '←', '→'];
+            const actions = [];
+            for (let i = 0; i < n * n; i++) {
+                const randomAction = actionsList[Math.floor(Math.random() * 4)];
+                actions.push(randomAction);
+            }
+            return actions;
+        }
+
+        // Get the next state after taking an action
+        function getNextState(row, col, rowOffset, colOffset, n) {
+            const newRow = row + rowOffset;
+            const newCol = col + colOffset;
+            
+            // Check if the new state is within bounds and not a barrier
+            if (newRow >= 0 && newRow < n && newCol >= 0 && newCol < n) {
+                // Make sure it's not a barrier
+                if (!obstacles.some(obstacle => obstacle.row === newRow && obstacle.col === newCol)) {
+                    return { row: newRow, col: newCol };
+                }
+            }
+            return null;  // Return null if out of bounds or a barrier
+        }
+
+        // Value Iteration Algorithm
+        function valueIteration(n) {
+            let V = new Array(n).fill(0).map(() => new Array(n).fill(0));
+            let delta = 0;
+            let iterationsLeft = iterations;
+
+            while (iterationsLeft > 0) {
+                delta = 0;
+                for (let i = 0; i < n; i++) {
+                    for (let j = 0; j < n; j++) {
+                        // Skip obstacles
+                        if (obstacles.some(obstacle => obstacle.row === i && obstacle.col === j)) continue;
+
+                        // Check if the cell is the end point
+                        let reward = -1;  // Default reward for moving
+                        if (end && end.row === i && end.col === j) {
+                            reward = 100;  // Large reward for reaching the end point
+                        }
+
+                        let oldV = V[i][j];
+                        let maxV = -Infinity;
+                        let bestAction = '';
+                        for (let k = 0; k < directionOffsets.length; k++) {
+                            const { row, col } = directionOffsets[k];
+                            const nextState = getNextState(i, j, row, col, n);
+                            if (nextState) {
+                                let nextV = V[nextState.row][nextState.col];
+                                let expectedV = reward + gamma * nextV;
+                                if (expectedV > maxV) {
+                                    maxV = expectedV;
+                                    bestAction = actionDirections[k];
+                                }
+                            }
+                        }
+
+                        // Update value and action
+                        V[i][j] = maxV;
+                        grid[i][j].action = bestAction;
+                        delta = Math.max(delta, Math.abs(oldV - maxV));
+                    }
+                }
+
+                // Convergence check
+                if (delta < 0.01) break;  
+                iterationsLeft--;
+            }
+
+            // Store V(s) values back into the grid
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    grid[i][j].value = V[i][j];
+                }
+            }
+
+            // Re-draw the grid after value iteration to show updated values
+            drawGrid(n);
+        }
+
+        function drawGrid(n) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${n}, 50px)`;
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', () => handleCellClick(i, j));
+                    container.appendChild(cell);
+
+                    // Display action (↑, ↓, ←, →)
+                    const action = grid[i][j].action;
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow';
+                    arrow.innerText = action;
+                    cell.appendChild(arrow);
+
+                    // Display value V(s)
+                    const valueText = document.createElement('div');
+                    valueText.className = 'value-text';
+                    valueText.innerText = `V(s)=${grid[i][j].value.toFixed(2)}`;
+                    cell.appendChild(valueText);
+
+                    // Retain start point
+                    if (start && start.row === i && start.col === j) {
+                        cell.style.backgroundColor = 'green';
+                    }
+
+                    // Retain end point
+                    if (end && end.row === i && end.col === j) {
+                        cell.style.backgroundColor = 'red';
+                    }
+
+                    // Retain barriers
+                    if (obstacles.some(obstacle => obstacle.row === i && obstacle.col === j)) {
+                        cell.style.backgroundColor = 'gray';
+                    }
+                }
+            }
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            barrierClicks = 0;
+            obstacles = [];
+            document.getElementById('start-end-btn').disabled = (mode === 'start-end');
+            document.getElementById('barrier-btn').disabled = (mode === 'barrier');
+        }
+
+        function handleCellClick(row, col) {
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            if (mode === 'start-end') {
+                if (start === null && end === null) {
+                    start = { row, col };
+                    cell.style.backgroundColor = 'green';
+                } else if (start !== null && end === null) {
+                    end = { row, col };
+                    cell.style.backgroundColor = 'red';
+                } else {
+                    if (start) {
+                        const startCell = document.querySelector(`[data-row="${start.row}"][data-col="${start.col}"]`);
+                        startCell.style.backgroundColor = 'white';
+                    }
+                    if (end) {
+                        const endCell = document.querySelector(`[data-row="${end.row}"][data-col="${end.col}"]`);
+                        endCell.style.backgroundColor = 'white';
+                    }
+                    start = null;
+                    end = null;
+                }
+            } else if (mode === 'barrier') {
+                const gridSize = grid.length;
+                if (barrierClicks < (gridSize - 2)) {
+                    cell.style.backgroundColor = 'gray';
+                    obstacles.push({ row, col });
+                    barrierClicks++;
+                } else if (barrierClicks === (gridSize - 2)) {
+                    obstacles.forEach(obstacle => {
+                        const barrierCell = document.querySelector(`[data-row="${obstacle.row}"][data-col="${obstacle.col}"]`);
+                        barrierCell.style.backgroundColor = 'white';
+                    });
+                    obstacles = [];
+                    barrierClicks = 0;
+                }
+            }
+        }
+
+        function startValueIteration() {
+            if (start === null || end === null || obstacles.length === 0) {
+                alert('Please set start point, end point, and barriers before starting value iteration.');
+                return;
+            }
+
+            const n = parseInt(document.getElementById('grid-size').value);
+            valueIteration(n);  // Trigger the value iteration computation
+        }
+
+        function clearGrid() {
+            // Clear start, end, and obstacles
+            start = null;
+            end = null;
+            obstacles = [];
+
+            // Redraw the grid to show empty cells
+            const n = parseInt(document.getElementById('grid-size').value);
+            drawGrid(n);
+
+            // Enable setting buttons again
+            document.getElementById('start-end-btn').disabled = false;
+            document.getElementById('barrier-btn').disabled = false;
+        }
+    </script>
+</body>
+</html>
